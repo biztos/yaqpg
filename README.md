@@ -1,5 +1,14 @@
 # YAQPg - Yet Another Queue for PostgreSQL
 
+[![GoDoc][b1]][doc] [![Report Card][b2]][rpt] [![Coverage Status][b3]][cov]
+
+[b1]: https://pkg.go.dev/badge/github.com/biztos/yaqpg
+[doc]: https://pkg.go.dev/github.com/biztos/yaqpg
+[b2]: https://goreportcard.com/badge/github.com/biztos/yaqpg
+[rpt]: https://goreportcard.com/report/github.com/biztos/yaqpg
+[b3]: https://coveralls.io/repos/github/biztos/yaqpg/badge.svg
+[cov]: https://coveralls.io/github/biztos/yaqpg
+
 YAQPg is a _simple_ PostgreSQL locking (and skipping) queue for local use.
 It is pronounced "yack-pee-gee" -- or _jákpídzí_ or อยากผีจี if you prefer.
 

@@ -1,0 +1,72 @@
+# NOTE: this and jsobs should have basically identical workflows, any
+# variation other than the name is probably a mistake!
+name: YAQPG CI
+on: push
+
+jobs:
+  test-job:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.20.1'
+
+      # Download (hopefully cached) dependencies in a separate step so we do
+      # not get confused about how long build/test steps actually take.
+      - name: Download dependencies
+        run: go mod download
+
+      # NOTE: separate build and test sections are nice for compartmentalizing
+      # the results, but also a waste of time.  If every second counts, then
+      # just go with the coverage test.  With complex database testing this
+      # may well be the case, because the Git postgres service appears to be
+      # very slow, compared to my local run which takes about half a second.
+      - name: Build
+        run: go build ./...
+
+      - name: Run tests
+        run: go test -v ./...
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
+      - name: Generate coverage profile
+        run: go test -coverprofile=cover.out ./...
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
+      - name: Generate HTML coverage report
+        run: go tool cover -html=cover.out -o=cover.html
+
+      - name: Upload Go coverage report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Go-coverage-report
+          path: cover.html
+
+      - name: Send coverage report to Coveralls.io
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: cover.out
+# END
