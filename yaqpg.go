@@ -60,25 +60,23 @@ func (p FunctionProcessor) Process(ctx context.Context, item *Item) error {
 	return p.Function(ctx, item)
 }
 
-// DefaultExponentialDelay returns DefaultReprocessDelay to the power of
-// attempts, up to a maximum of DefaultMaxReprocessDelay.
-func DefaultExponentialDelay(attempts int) time.Duration {
+// DefaultBackoffDelay returns DefaultReprocessDelay that doubles for every
+// attempt over one, up to DefaultMaxReprocessDelay.
+func DefaultBackoffDelay(attempts int) time.Duration {
 
 	if DefaultReprocessDelay == 0 || attempts < 2 {
 		return DefaultReprocessDelay
 	}
 
-	m := int(DefaultReprocessDelay)
-	d := m
-	for i := 2; i <= attempts; i++ {
-		d *= m
+	max := int(DefaultMaxReprocessDelay)
+	delay := int(DefaultReprocessDelay)
+	for i := 0; i < attempts; i++ {
+		delay = delay * 2
+		if delay > max {
+			return DefaultMaxReprocessDelay
+		}
 	}
-
-	delay := time.Duration(d)
-	if delay > DefaultMaxReprocessDelay {
-		delay = DefaultMaxReprocessDelay
-	}
-	return delay
+	return time.Duration(delay)
 }
 
 // DefaultStableDelay returns DefaultReprocessDelay regardless of attempts.
