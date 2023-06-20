@@ -85,7 +85,7 @@ WHERE ident = $1;`)
 func Schema(q *Queue) string {
 	// multiple replacements here, so...
 	sqlf := `-- schemaSQL: create the YAQPg schema for queue %s
-	DROP TABLE IF EXISTS %s;
+DROP TABLE IF EXISTS %s;
 CREATE TABLE %s (
 	id BIGSERIAL NOT NULL PRIMARY KEY,
 	queue_name TEXT NOT NULL,
@@ -98,6 +98,7 @@ CREATE UNIQUE INDEX %s_nit_idx ON %s USING BTREE(queue_name,ident,ready_at);
 `
 	return fmt.Sprintf(sqlf,
 		q.Name,
+		q.TableName,
 		q.TableName,
 		q.TableName,
 		q.TableName,

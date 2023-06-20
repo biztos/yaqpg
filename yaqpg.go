@@ -140,6 +140,14 @@ func (q *Queue) Connect(max_connections int) error {
 // then a placeholder item is created and deleted to ensure the connection and
 // table are as expected.
 func (q *Queue) Setup() error {
+
+	sql := Schema(q)
+	_, err := q.Pool.Exec(context.Background(), sql)
+	if err != nil {
+		fmt.Println(sql)
+		return err
+	}
+
 	q.Log("TODO: setup check for table and create if needed")
 	// just do the create table sql first and check for error,
 	// if exists then skip creation
@@ -499,8 +507,8 @@ func (q *Queue) Process(limit int, proc Processor) error {
 
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*Item, error) {
 		var i Item
-		err := i.Scan(row) // NOTE: inverse of documentation! Bug?
-		return &i, err
+		// err := i.Scan(row) // NOTE: inverse of documentation! Bug?
+		return &i, i.Scan(row)
 	})
 
 	if len(items) == 0 {

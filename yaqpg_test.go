@@ -3,15 +3,26 @@
 package yaqpg_test
 
 import (
-	"testing"
+	"os"
 
 	"github.com/biztos/yaqpg"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestPlaceholder(t *testing.T) {
-	assert := assert.New(t)
-	assert.True(true, "truthy placeholder")
-	assert.Equal("jobs", yaqpg.DefaultQueueName)
+func (suite *YaqpgTestSuite) TestMustStartDefaultQueuePanics() {
+
+	require := suite.Require()
+
+	orig := os.Getenv("DATABASE_URL")
+	defer os.Setenv("DATABASE_URL", orig)
+	os.Setenv("DATABASE_URL", "")
+
+	require.Panics(func() { yaqpg.MustStartDefaultQueue() })
+
+}
+
+func (suite *YaqpgTestSuite) TestMustStartDefaultQueueOK() {
+
+	require := suite.Require()
+	require.NotPanics(func() { yaqpg.MustStartDefaultQueue() })
+
 }
