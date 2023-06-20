@@ -29,7 +29,7 @@ func (suite *YaqpgTestSuite) SetupSuite() {
 
 	queue, err := yaqpg.StartDefaultQueue()
 	require.NoError(err, "queue start err")
-	require.NoError(queue.Setup(), "setup err")
+	require.NoError(queue.CreateSchema(), "schema err")
 	suite.Queue = queue
 
 }

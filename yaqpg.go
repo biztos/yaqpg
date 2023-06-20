@@ -136,52 +136,12 @@ func (q *Queue) Connect(max_connections int) error {
 
 }
 
-// Setup connects and creates the queue table if needed; if it already exists
-// then a placeholder item is created and deleted to ensure the connection and
-// table are as expected.
-func (q *Queue) Setup() error {
-
-	sql := Schema(q)
-	_, err := q.Pool.Exec(context.Background(), sql)
-	if err != nil {
-		fmt.Println(sql)
-		return err
-	}
-
-	q.Log("TODO: setup check for table and create if needed")
-	// just do the create table sql first and check for error,
-	// if exists then skip creation
-	ctx := context.Background()
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-	// this is stupid, maybe? if doing own SQL it's redundant, if trusting
-	// theirs then just error out whenever, right?
-	q.Log("starting: insert placeholder")
-
-	ts := time.Now().Add(time.Hour * 10000)
-	ident := fmt.Sprintf("---- placeholder %d ----", rand.Uint64())
-	payload := "any string will do"
-
-	ins_sql := insertPlaceholderSQL(q)
-	ins_tag, err := conn.Exec(ctx, ins_sql, q.Name, ident, payload, ts)
-	if err != nil {
-		q.Logf("starting: insert placeholder: %s, %s, %s",
-			ident, ins_tag, err)
-		return err
-	}
-
-	q.Log("starting: delete placeholder")
-	del_sql := deletePlaceholderSQL(q)
-	del_tag, err := conn.Exec(ctx, del_sql, ident)
-	if err != nil {
-		q.Logf("starting: delete placeholder: %s, %s, %s",
-			ident, del_tag, err)
-		return err
-	}
-	return nil
+// CreateSchema connects and creates the queue table and indexes if needed.
+// Existing relations are NOT dropped!  The queue must already have connected
+// to the database.
+func (q *Queue) CreateSchema() error {
+	_, err := q.Pool.Exec(context.Background(), Schema(q))
+	return err
 }
 
 // Add adds an item to the queue.  The item will be immediately available.
