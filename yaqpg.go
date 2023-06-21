@@ -221,13 +221,8 @@ func (q *Queue) AddBatchDelayed(items []*Item, delay time.Duration) error {
 func (q *Queue) addWithReadyAt(ident string, payload []byte, ready_at time.Time) error {
 
 	ctx := context.Background()
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
 	sql := insertQueueItemSQL(q)
-	if _, err := conn.Exec(ctx, sql, q.Name, ident, payload, ready_at); err != nil {
+	if _, err := q.Pool.Exec(ctx, sql, q.Name, ident, payload, ready_at); err != nil {
 		return err
 	}
 	return nil
@@ -244,12 +239,7 @@ func (q *Queue) addBatchWithReadyAt(batch_id ulid.ULID, items []*Item, ready_at 
 	}
 
 	ctx := context.Background() // should not hang, so let it hang...
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-	tx, err := conn.Begin(ctx)
+	tx, err := q.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -280,14 +270,9 @@ func (q *Queue) addBatchWithReadyAt(batch_id ulid.ULID, items []*Item, ready_at 
 func (q *Queue) Count() (int, error) {
 
 	ctx := context.Background()
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer conn.Release()
 	sql := selectCountSQL(q)
 	var count int
-	if err := conn.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
+	if err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -311,15 +296,11 @@ func (q *Queue) MustCount() int {
 // of items being processed, this can be handled on the code side easily
 // enough, but is probably not worth the trouble.)
 func (q *Queue) CountReady() (int, error) {
+
 	ctx := context.Background()
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer conn.Release()
 	sql := selectCountReadySQL(q)
 	var count int
-	if err := conn.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
+	if err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -329,15 +310,11 @@ func (q *Queue) CountReady() (int, error) {
 // i.e. those with a ready_at later than the current time.  For obvious
 // reasons, this number may be inaccurate by the time you consume it.
 func (q *Queue) CountPending() (int, error) {
+
 	ctx := context.Background()
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer conn.Release()
 	sql := selectCountPendingSQL(q)
 	var count int
-	if err := conn.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
+	if err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -442,17 +419,10 @@ func (q *Queue) Process(limit int, proc Processor) error {
 	// First we get the items.
 	q.Logf("processing <= %d in batch: %s", limit, ulid)
 
-	ctx := context.Background()
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-
 	checkout_sql := selectCheckoutSQL(q)
 
 	bg := context.Background()
-	tx, err := conn.Begin(bg)
+	tx, err := q.Pool.Begin(bg)
 	if err != nil {
 		return err
 	}
