@@ -24,15 +24,12 @@ func main() {
 	if err := queue.AddDelayed("demo item 3", []byte("later payload"), time.Second*3); err != nil {
 		log.Fatal(err)
 	}
-	if err := queue.LogCounts(); err != nil {
-		log.Fatal(err)
-	}
+	queue.LogCounts()
 	if err := queue.Fill(10, 20, time.Second); err != nil {
 		log.Fatal(err)
 	}
-	if err := queue.LogCounts(); err != nil {
-		log.Fatal(err)
-	}
+	queue.LogCounts()
+
 	log.Println("Processing, 10 at a time, with 50-50 chance of rejection.")
 	log.Println("...but not much delay and low tolerance for attempts...")
 	queue.MaxAttempts = 2
@@ -50,9 +47,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := queue.LogCounts(); err != nil {
-			log.Fatal(err)
-		}
+		queue.LogCounts()
+
 		time.Sleep(time.Second / 2)
 	}
 

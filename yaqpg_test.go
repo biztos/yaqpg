@@ -9,6 +9,48 @@ import (
 	"github.com/biztos/yaqpg"
 )
 
+func (suite *YaqpgTestSuite) TestCountReadyError() {
+
+	require := suite.Require()
+
+	orig := suite.Queue.TableName
+	defer func() { suite.Queue.TableName = orig }()
+	suite.Queue.TableName = "syntax/error/right/here"
+
+	_, err := suite.Queue.CountReady()
+	require.ErrorContains(err, "SQLSTATE 42601")
+}
+
+func (suite *YaqpgTestSuite) TestCountReadyOK() {
+
+	require := suite.Require()
+	require.NoError(suite.Queue.Fill(3, 4, 1))
+	c, err := suite.Queue.CountReady()
+	require.NoError(err)
+	require.Equal(3, c, "number ready")
+}
+
+func (suite *YaqpgTestSuite) TestCountPendingError() {
+
+	require := suite.Require()
+
+	orig := suite.Queue.TableName
+	defer func() { suite.Queue.TableName = orig }()
+	suite.Queue.TableName = "syntax/error/right/here"
+
+	_, err := suite.Queue.CountPending()
+	require.ErrorContains(err, "SQLSTATE 42601")
+}
+
+func (suite *YaqpgTestSuite) TestCountPendingOK() {
+
+	require := suite.Require()
+	require.NoError(suite.Queue.Fill(3, 4, time.Minute))
+	c, err := suite.Queue.CountPending()
+	require.NoError(err)
+	require.Equal(3, c, "number Pending")
+}
+
 func (suite *YaqpgTestSuite) TestMustStartNamedQueuePanics() {
 
 	require := suite.Require()
@@ -52,7 +94,7 @@ func (suite *YaqpgTestSuite) TestMustCountPanics() {
 	require := suite.Require()
 	orig := suite.Queue.TableName
 	defer func() { suite.Queue.TableName = orig }()
-	suite.Queue.TableName = "nope"
+	suite.Queue.TableName = "syntax/error/here"
 
 	require.Panics(func() { suite.Queue.MustCount() })
 
@@ -63,6 +105,43 @@ func (suite *YaqpgTestSuite) TestMustCountOK() {
 	require := suite.Require()
 
 	require.NotPanics(func() { suite.Queue.MustCount() })
+
+}
+
+func (suite *YaqpgTestSuite) TestMustCountReadyPanics() {
+
+	require := suite.Require()
+	orig := suite.Queue.TableName
+	defer func() { suite.Queue.TableName = orig }()
+	suite.Queue.TableName = "syntax/error/here"
+
+	require.Panics(func() { suite.Queue.MustCountReady() })
+
+}
+
+func (suite *YaqpgTestSuite) TestMustCountReadyOK() {
+
+	require := suite.Require()
+
+	require.NotPanics(func() { suite.Queue.MustCountReady() })
+
+}
+func (suite *YaqpgTestSuite) TestMustCountPendingPanics() {
+
+	require := suite.Require()
+	orig := suite.Queue.TableName
+	defer func() { suite.Queue.TableName = orig }()
+	suite.Queue.TableName = "syntax/error/here"
+
+	require.Panics(func() { suite.Queue.MustCountPending() })
+
+}
+
+func (suite *YaqpgTestSuite) TestMustCountPendingOK() {
+
+	require := suite.Require()
+
+	require.NotPanics(func() { suite.Queue.MustCountPending() })
 
 }
 

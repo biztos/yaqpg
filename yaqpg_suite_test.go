@@ -14,11 +14,24 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+type TestLogger struct {
+	Logged []string
+}
+
+func (t *TestLogger) Clear() {
+	t.Logged = []string{}
+}
+
+func (t *TestLogger) Println(v ...interface{}) {
+	t.Logged = append(t.Logged, fmt.Sprint(v...))
+}
+
 type DoesNotMarshal string
 
 type YaqpgTestSuite struct {
 	suite.Suite
-	Queue *yaqpg.Queue
+	Queue  *yaqpg.Queue
+	Logger *TestLogger
 }
 
 func (suite *YaqpgTestSuite) SetupSuite() {
@@ -30,6 +43,8 @@ func (suite *YaqpgTestSuite) SetupSuite() {
 	queue, err := yaqpg.StartDefaultQueue()
 	require.NoError(err, "queue start err")
 	require.NoError(queue.CreateSchema(), "schema err")
+	suite.Logger = &TestLogger{}
+	queue.Logger = suite.Logger
 	suite.Queue = queue
 
 }
@@ -60,6 +75,9 @@ func (suite *YaqpgTestSuite) SetupTest() {
 	sql := fmt.Sprintf("TRUNCATE TABLE %s;", suite.Queue.TableName)
 	_, err := suite.Queue.Pool.Exec(context.Background(), sql)
 	require.NoError(err, "truncate exec")
+
+	// and the logger
+	suite.Logger.Clear()
 
 }
 

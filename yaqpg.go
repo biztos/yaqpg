@@ -306,6 +306,15 @@ func (q *Queue) CountReady() (int, error) {
 	return count, nil
 }
 
+// MustCountReady calls CountReady and panics on error.
+func (q *Queue) MustCountReady() int {
+	count, err := q.CountReady()
+	if err != nil {
+		panic(err)
+	}
+	return count
+}
+
 // CountPending returns the total number of items not yet ready in the queue,
 // i.e. those with a ready_at later than the current time.  For obvious
 // reasons, this number may be inaccurate by the time you consume it.
@@ -320,28 +329,25 @@ func (q *Queue) CountPending() (int, error) {
 	return count, nil
 }
 
-// LogCounts retrieves and logs the counts.
-func (q *Queue) LogCounts() error {
-	total, err := q.Count()
+// MustCountPending calls CountPending and panics on error.
+func (q *Queue) MustCountPending() int {
+	count, err := q.CountPending()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	ready, err := q.CountReady()
-	if err != nil {
-		log.Fatal(err)
-	}
-	pending, err := q.CountPending()
-	if err != nil {
-		log.Fatal(err)
-	}
-	q.Logf("item count: %d (ready: %d, pending: %d)", total, ready, pending)
-	return nil
+	return count
+}
+
+// LogCounts retrieves and logs the counts, and panics if any count returns an
+// error.
+func (q *Queue) LogCounts() {
+	q.Logf("item count: %d (ready: %d, pending: %d)",
+		q.MustCount(), q.MustCountReady(), q.MustCountPending())
 }
 
 // Fill fills the queue with count items of test data, with a randomized delay
 // up to delay_max. The payload will be payload_size bytes of random data.
-// Every item will have the same payload_size and
-// the same for every item
+// Every item will have the same payload.
 //
 // Fill concurrently adds batches of up to FillBatchSize items, all of which
 // will have the same delay time.  More randomness can be obtained by setting
