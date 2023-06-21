@@ -1,4 +1,4 @@
-# YAQPg - Yet Another Queue for PostgreSQL
+# yaqpg - Yet Another Queue for PostgreSQL
 
 [![GoDoc][b1]][doc] [![Report Card][b2]][rpt] [![Coverage Status][b3]][cov]
 
