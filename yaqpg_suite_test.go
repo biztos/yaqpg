@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/biztos/yaqpg"
 
@@ -34,12 +35,27 @@ type YaqpgTestSuite struct {
 	Logger *TestLogger
 }
 
+func (suite *YaqpgTestSuite) AssertLogged(msgs ...string) {
+
+	assert := suite.Assert()
+
+	// best comparison output is from EqualValues so just do that, however
+	// it would be nice to have a regexp option too.
+	for i, m := range msgs {
+		msgs[i] = fmt.Sprintf("[%s] %s", suite.Queue.Name, m)
+	}
+	assert.EqualValues(msgs, suite.Logger.Logged, "log entries")
+
+}
+
 func (suite *YaqpgTestSuite) SetupSuite() {
 
 	require := suite.Require()
 
 	yaqpg.DefaultTableName = fmt.Sprintf("yaqpg_test_%s", ulid.Make())
-
+	yaqpg.Now = func() time.Time {
+		return time.Time{}
+	}
 	queue, err := yaqpg.StartDefaultQueue()
 	require.NoError(err, "queue start err")
 	require.NoError(queue.CreateSchema(), "schema err")
@@ -78,6 +94,9 @@ func (suite *YaqpgTestSuite) SetupTest() {
 
 	// and the logger
 	suite.Logger.Clear()
+
+	// make sure any random fills we do have headroom
+	yaqpg.FillBatchSize = 200
 
 }
 

@@ -27,8 +27,8 @@ func selectCheckoutSQL(q *Queue) string {
 	return tableSQL(q, `-- selectCheckoutSQL
 SELECT id, ident, attempts, payload
 FROM %s
-WHERE queue_name = $1 AND ready_at <= now()
-ORDER BY id ASC LIMIT $2
+WHERE queue_name = $1 AND ready_at <= $2
+ORDER BY id ASC LIMIT $3
 FOR UPDATE SKIP LOCKED;`)
 }
 
@@ -56,14 +56,14 @@ func selectCountReadySQL(q *Queue) string {
 	return tableSQL(q, `-- selectCountReadySQL
 SELECT COUNT(*)
 FROM %s
-WHERE queue_name = $1 AND ready_at <= now();`)
+WHERE queue_name = $1 AND ready_at <= $2;`)
 }
 
 func selectCountPendingSQL(q *Queue) string {
 	return tableSQL(q, `-- selectCountPendingSQL
 SELECT COUNT(*)
 FROM %s
-WHERE queue_name = $1 AND ready_at > now();`)
+WHERE queue_name = $1 AND ready_at > $2;`)
 }
 
 func insertPlaceholderSQL(q *Queue) string {

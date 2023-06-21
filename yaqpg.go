@@ -41,6 +41,15 @@ type Logger interface {
 
 var DefaultLogger Logger = log.Default()
 
+// Overridable with custom "now" for testing.
+var Now = time.Now
+
+var DelayTime = func(d time.Duration) time.Time {
+	return Now().Add(d)
+}
+
+var Exit = os.Exit
+
 // Processor is the thing that processes an item, returning an error if not
 // completed successfully.
 type Processor interface {
@@ -96,10 +105,6 @@ type Queue struct {
 	Silent                bool
 }
 
-func (q *Queue) tableSql(sqlf string) string {
-	return fmt.Sprintf(sqlf, q.TableName)
-}
-
 // Log writes v to the logger, with the queue [Name] as a prefix.
 func (q *Queue) Log(v ...interface{}) {
 	if q.Silent == false {
@@ -127,7 +132,8 @@ func (q *Queue) Connect(max_connections int) error {
 	connstr := fmt.Sprintf("%s?pool_max_conns=%d", dburl, max_connections)
 	pool, err := pgxpool.New(context.Background(), connstr)
 	if err != nil {
-		log.Fatal(err)
+		q.Log(err)
+		Exit(1)
 	}
 	q.Pool = pool
 	return nil
@@ -146,7 +152,7 @@ func (q *Queue) CreateSchema() error {
 func (q *Queue) Add(ident string, payload []byte) error {
 
 	q.Logf("adding %s", ident)
-	err := q.addWithReadyAt(ident, payload, time.Now())
+	err := q.addWithReadyAt(ident, payload, DelayTime(0))
 	if err != nil {
 		q.Logf("adding %s: %s", ident, err)
 		return err
@@ -160,7 +166,7 @@ func (q *Queue) Add(ident string, payload []byte) error {
 // AddDelayed adds an item to the queue with the specified delay.
 func (q *Queue) AddDelayed(ident string, payload []byte, delay time.Duration) error {
 
-	ready_at := time.Now().Add(delay)
+	ready_at := DelayTime(delay)
 	ready_at_str := ready_at.Format(time.DateTime)
 	q.Logf("adding %s for %s", ident, ready_at_str)
 	err := q.addWithReadyAt(ident, payload, ready_at)
@@ -180,7 +186,7 @@ func (q *Queue) AddDelayed(ident string, payload []byte, delay time.Duration) er
 func (q *Queue) AddBatch(items []*Item) error {
 
 	batch_id := ulid.Make()
-	ready_at := time.Now()
+	ready_at := DelayTime(0)
 	q.Logf("adding batch %s: %d items",
 		batch_id, len(items))
 
@@ -202,7 +208,7 @@ func (q *Queue) AddBatch(items []*Item) error {
 // given the BatchId unique to this call.
 func (q *Queue) AddBatchDelayed(items []*Item, delay time.Duration) error {
 	batch_id := ulid.Make()
-	ready_at := time.Now().Add(delay)
+	ready_at := DelayTime(delay)
 	ready_at_str := ready_at.Format(time.DateTime)
 	q.Logf("adding batch %s: %d items at %s",
 		batch_id, len(items), ready_at_str)
@@ -258,11 +264,7 @@ func (q *Queue) addBatchWithReadyAt(batch_id ulid.ULID, items []*Item, ready_at 
 			return err
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return tx.Commit(ctx)
 }
 
 // Count returns the total number of items in the queue, regardless of ready_at
@@ -272,10 +274,9 @@ func (q *Queue) Count() (int, error) {
 	ctx := context.Background()
 	sql := selectCountSQL(q)
 	var count int
-	if err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+	err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count)
+	return count, err
+
 }
 
 // MustCount calls Count and panics on error.
@@ -300,10 +301,8 @@ func (q *Queue) CountReady() (int, error) {
 	ctx := context.Background()
 	sql := selectCountReadySQL(q)
 	var count int
-	if err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+	err := q.Pool.QueryRow(ctx, sql, q.Name, Now()).Scan(&count)
+	return count, err
 }
 
 // MustCountReady calls CountReady and panics on error.
@@ -323,10 +322,8 @@ func (q *Queue) CountPending() (int, error) {
 	ctx := context.Background()
 	sql := selectCountPendingSQL(q)
 	var count int
-	if err := q.Pool.QueryRow(ctx, sql, q.Name).Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+	err := q.Pool.QueryRow(ctx, sql, q.Name, Now()).Scan(&count)
+	return count, err
 }
 
 // MustCountPending calls CountPending and panics on error.
@@ -359,32 +356,26 @@ func (q *Queue) LogCounts() {
 func (q *Queue) Fill(count int, payload_size int, delay_max time.Duration) error {
 
 	payload := make([]byte, payload_size)
-	_, err := rand.Read(payload)
-	if err != nil {
-		return err
-
-	}
+	rand.Read(payload) // don't care size, and error not possible
 
 	if count <= FillBatchSize {
 		delay := time.Duration(rand.Intn(int(delay_max)))
-		err := q.fillBatch(count, 0, payload, delay)
+		return q.fillBatch(count, 0, payload, delay)
+	}
+
+	mod := count % FillBatchSize
+	if mod > 0 {
+		count -= mod
+		delay := time.Duration(rand.Intn(int(delay_max)))
+		err := q.fillBatch(mod, 0, payload, delay)
 		if err != nil {
 			return err
 		}
-		return nil
 	}
 
 	for i := 0; i < count; i += FillBatchSize {
 		delay := time.Duration(rand.Intn(int(delay_max)))
-		err := q.fillBatch(FillBatchSize, i, payload, delay)
-		if err != nil {
-			return err
-		}
-	}
-	remain := count % FillBatchSize
-	if remain > 0 {
-		delay := time.Duration(rand.Intn(int(delay_max)))
-		err := q.fillBatch(remain, count-remain, payload, delay)
+		err := q.fillBatch(FillBatchSize, i+mod, payload, delay)
 		if err != nil {
 			return err
 		}
@@ -434,7 +425,7 @@ func (q *Queue) Process(limit int, proc Processor) error {
 	}
 	defer tx.Rollback(bg) // safe after commit!
 
-	rows, err := tx.Query(bg, checkout_sql, q.Name, limit)
+	rows, err := tx.Query(bg, checkout_sql, q.Name, Now(), limit)
 	if err != nil {
 		return err
 	}
@@ -515,7 +506,7 @@ func (q *Queue) Process(limit int, proc Processor) error {
 			delay := q.ReprocessDelayFunc(item.Attempts + 1) // counting this one
 			delay_groups[delay] = append(delay_groups[delay], item.id)
 		}
-		now := time.Now() // same for all groups.
+		now := DelayTime(0) // same for all groups.
 		for delay, group := range delay_groups {
 
 			retry_at := now.Add(delay)
